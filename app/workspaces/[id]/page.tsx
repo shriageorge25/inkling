@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "../../lib/prisma";
 import { getCurrentUser } from "../../lib/current-user";
 import UploadDocument from "../../components/UploadDocument";
@@ -14,6 +14,7 @@ export default async function WorkspacePage({
 }) {
     const { id } = await params;
     const user = await getCurrentUser();
+    if (!user) redirect("/");
 
     const workspace = await prisma.workspace.findFirst({
         where: { id, userId: user.id },

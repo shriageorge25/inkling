@@ -58,6 +58,9 @@ export async function GET(
     try {
         const { id } = await params;
         const user = await getCurrentUser();
+        if (!user) {
+            return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         const workspace = await prisma.workspace.findFirst({
             where: { id, userId: user.id },
@@ -87,6 +90,9 @@ export async function POST(
     try {
         const { id } = await params;
         const user = await getCurrentUser();
+        if (!user) {
+            return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         const body = await request.json();
         const type = body.type as StudyType;

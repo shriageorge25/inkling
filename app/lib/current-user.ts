@@ -1,7 +1,9 @@
+import { auth } from "./auth";
 import { prisma } from "./prisma";
 
 export async function getCurrentUser() {
-    return prisma.user.findUniqueOrThrow({
-        where: { email: "demo@inkling.com" },
-    });
+    const session = await auth();
+    const id = session?.user?.id;
+    if (!id) return null;
+    return prisma.user.findUnique({ where: { id } });
 }
