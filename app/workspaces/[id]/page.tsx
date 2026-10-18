@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "../../lib/prisma";
 import { getCurrentUser } from "../../lib/current-user";
 import UploadDocument from "../../components/UploadDocument";
-import ChatPanel from "../../components/ChatPanel";
+import WorkspaceTabs from "../../components/WorkspaceTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +54,7 @@ export default async function WorkspacePage({
                 </section>
 
                 <section className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
-                    <h2 className="font-semibold text-slate-900">Chat</h2>
-                    <ChatPanel workspaceId={workspace.id} />
+                    <WorkspaceTabs workspaceId={workspace.id} />
                 </section>
             </div>
         </main>

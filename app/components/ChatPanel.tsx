@@ -23,8 +23,6 @@ const markdownComponents: Components = {
 const STUDY_ACTIONS = [
     { label: "Summary", prompt: "Summarize my documents clearly, covering the key points." },
     { label: "Study notes", prompt: "Create concise, well-organized study notes from my documents, with headings and bullet points." },
-    { label: "Quiz", prompt: "Create a 5-question multiple choice quiz from my documents. Put the answers at the end." },
-    { label: "Flashcards", prompt: "Create 8 flashcards from my documents. Format each one as Q: ... and A: ..." },
 ];
 
 export default function ChatPanel({ workspaceId }: { workspaceId: string }) {

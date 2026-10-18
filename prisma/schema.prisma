@@ -23,6 +23,7 @@ model Workspace {
   createdAt DateTime   @default(now())
   chats     Chat[]
   documents Document[]
+  studyMaterials StudyMaterial[]
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -42,5 +43,14 @@ model Chat {
   messages    String
   createdAt   DateTime  @default(now())
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+model StudyMaterial {
+  id          String    @id @default(cuid())
+  workspaceId String
+  type        String
+  title       String
+  content     String
+  createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
