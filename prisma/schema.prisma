@@ -18,6 +18,7 @@ model User {
   workspaces    Workspace[]
   accounts      Account[]
   sessions      Session[]
+  usageEvents UsageEvent[]
 }
 
 model Workspace {
@@ -90,4 +91,14 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model UsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

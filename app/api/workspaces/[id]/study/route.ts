@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
 import { openai, AI_MODEL } from "../../../../lib/ai";
 import { buildContext } from "../../../../lib/context";
+import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -111,6 +112,8 @@ export async function POST(
             return Response.json({ error: "Upload a document first" }, { status: 400 });
         }
 
+        const usage = await consumeAiUsage(user.id, "study");
+        if (!usage.allowed) return limitReachedResponse();
         const { schema, instruction } = TYPES[type];
         const context = buildContext(workspace.documents);
 

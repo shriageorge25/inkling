@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
+import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
 
 export const runtime = "nodejs";
 
@@ -67,6 +68,8 @@ export async function POST(
         if (!message) {
             return Response.json({ error: "Message is required" }, { status: 400 });
         }
+        const usage = await consumeAiUsage(user.id, "chat");
+        if (!usage.allowed) return limitReachedResponse();
 
         let context = workspace.documents
             .map((d) => `### ${d.name}\n${d.textChunks}`)
