@@ -3,6 +3,7 @@ import { prisma } from "./lib/prisma";
 import { getCurrentUser } from "./lib/current-user";
 import CreateWorkspace from "./components/CreateWorkspace";
 import AuthBar from "./components/AuthBar";
+import DeleteButton from "./components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -42,16 +43,22 @@ export default async function Home() {
             ) : (
               <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {workspaces.map((w) => (
-                  <li key={w.id}>
+                  <li key={w.id} className="relative">
                     <Link
                       href={`/workspaces/${w.id}`}
-                      className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-400"
+                      className="block rounded-lg border border-slate-200 bg-white p-4 pr-16 hover:border-slate-400"
                     >
                       <p className="font-medium text-slate-900">{w.name}</p>
                       <p className="mt-1 text-sm text-slate-500">
                         {w.createdAt.toLocaleDateString()}
                       </p>
                     </Link>
+                    <div className="absolute right-3 top-3">
+                      <DeleteButton
+                        url={`/api/workspaces/${w.id}`}
+                        confirmText={`Delete "${w.name}" and everything in it?`}
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>

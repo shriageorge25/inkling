@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { StudyMaterial } from "./types";
 import QuizView from "./QuizView";
 import FlashcardsView from "./FlashcardsView";
+import DeleteButton from "../DeleteButton";
 
 export default function StudyPanel({ workspaceId }: { workspaceId: string }) {
     const [materials, setMaterials] = useState<StudyMaterial[]>([]);
@@ -68,7 +69,6 @@ export default function StudyPanel({ workspaceId }: { workspaceId: string }) {
 
             {materials.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
-
                     {materials.map((m) => (
                         <button
                             key={m.id}
@@ -82,6 +82,20 @@ export default function StudyPanel({ workspaceId }: { workspaceId: string }) {
                             {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </button>
                     ))}
+                </div>
+            )}
+            {selected && (
+                <div className="mt-2">
+                    <DeleteButton
+                        url={`/api/workspaces/${workspaceId}/study/${selected.id}`}
+                        confirmText="Delete this study material?"
+                        label="Delete this one"
+                        onDeleted={() => {
+                            const remaining = materials.filter((m) => m.id !== selected.id);
+                            setMaterials(remaining);
+                            setSelectedId(remaining[0]?.id ?? null);
+                        }}
+                    />
                 </div>
             )}
 

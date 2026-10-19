@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma";
 import { getCurrentUser } from "../../lib/current-user";
 import UploadDocument from "../../components/UploadDocument";
 import WorkspaceTabs from "../../components/WorkspaceTabs";
+import DeleteButton from "../../components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +44,17 @@ export default async function WorkspacePage({
                     ) : (
                         <ul className="mt-3 space-y-2">
                             {workspace.documents.map((d) => (
-                                <li key={d.id} className="text-sm text-slate-700">
-                                    {d.name}
-                                    <span className="ml-2 text-slate-400">
-                                        {d.textChunks.length.toLocaleString()} characters
+                                <li key={d.id} className="flex items-center justify-between gap-2 text-sm text-slate-700">
+                                    <span>
+                                        {d.name}
+                                        <span className="ml-2 text-slate-400">
+                                            {d.textChunks.length.toLocaleString()} characters
+                                        </span>
                                     </span>
+                                    <DeleteButton
+                                        url={`/api/workspaces/${workspace.id}/documents/${d.id}`}
+                                        confirmText={`Delete "${d.name}"?`}
+                                    />
                                 </li>
                             ))}
                         </ul>
