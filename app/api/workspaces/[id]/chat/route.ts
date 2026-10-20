@@ -2,14 +2,19 @@ import OpenAI from "openai";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
 import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
-import { retrieveChunks } from "../../../../lib/retrieval";
+import { retrieveChunks, type RetrievedChunk } from "../../../../lib/retrieval";
 
 export const runtime = "nodejs";
 
 const MAX_HISTORY = 20;
 const TOP_K = 6;
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type Source = { documentName: string; pageNumber: number | null };
+type ChatMessage = {
+    role: "user" | "assistant";
+    content: string;
+    sources?: Source[];
+};
 
 const openai = new OpenAI({
     apiKey: process.env.AI_API_KEY,
@@ -23,6 +28,37 @@ function parseMessages(raw: string): ChatMessage[] {
     } catch {
         return [];
     }
+}
+
+// Finds [Source N] markers in the reply, maps each number back to a real
+// retrieved chunk, and returns the cleaned text plus the sources actually used.
+function extractCitations(reply: string, chunks: RetrievedChunk[]) {
+    const groups = reply.match(/\[[^\]]*Source[^\]]*\]/gi) ?? [];
+
+    const sources: Source[] = [];
+    const seen = new Set<string>();
+    for (const group of groups) {
+        for (const m of group.matchAll(/Source\s*(\d+)/gi)) {
+            const chunk = chunks[Number(m[1]) - 1];
+            if (!chunk) continue; // number the model made up: ignore it
+            const key = `${chunk.documentName}|${chunk.pageNumber}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            sources.push({
+                documentName: chunk.documentName,
+                pageNumber: chunk.pageNumber,
+            });
+        }
+    }
+
+    const content = reply
+        .replace(/\[[^\]]*Source[^\]]*\]/gi, "")
+        .replace(/ {2,}/g, " ")
+        .replace(/ +([.,;:!?])/g, "$1")
+        .replace(/[ \t]+$/gm, "")
+        .trim();
+
+    return { content, sources };
 }
 
 export async function GET(
@@ -99,19 +135,35 @@ export async function POST(
             .join("\n\n");
 
         const systemPrompt = context
-            ? `You are Inkling, a study assistant. Answer using only the excerpts below, which were retrieved from the user's documents. If the answer is not in the excerpts, say so clearly instead of guessing.\n\nEXCERPTS:\n${context}`
+            ? `You are Inkling, a study assistant. Answer using only the excerpts below, which were retrieved from the user's documents. If the answer is not in the excerpts, say so clearly instead of guessing.
+
+After each statement that relies on an excerpt, cite it using only its number in square brackets, like [Source 2]. Use a separate bracket for each source, like [Source 1][Source 3]. Do not write anything else inside the brackets.
+
+EXCERPTS:
+${context}`
             : `You are Inkling, a study assistant. The user has not uploaded any documents yet, so tell them to upload a PDF if they want answers based on their material.`;
+
+        // Send only role and content to the model: the extra "sources" field
+        // on saved messages is ours, and the API may reject unknown fields.
+        const modelMessages = messages
+            .slice(-MAX_HISTORY)
+            .map(({ role, content }) => ({ role, content }));
 
         const completion = await openai.chat.completions.create({
             model: process.env.AI_MODEL ?? "gemini-2.5-flash-lite",
-            messages: [
-                { role: "system", content: systemPrompt },
-                ...messages.slice(-MAX_HISTORY),
-            ],
+            messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
         });
 
-        const reply = completion.choices[0]?.message?.content ?? "";
-        const updated: ChatMessage[] = [...messages, { role: "assistant", content: reply }];
+        const rawReply = completion.choices[0]?.message?.content ?? "";
+        const { content: reply, sources } = extractCitations(rawReply, chunks);
+        console.log("Cited:", sources);
+
+        const updated: ChatMessage[] = [
+            ...messages,
+            sources.length > 0
+                ? { role: "assistant", content: reply, sources }
+                : { role: "assistant", content: reply },
+        ];
 
         if (existing) {
             await prisma.chat.update({

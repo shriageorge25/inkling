@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Source = { documentName: string; pageNumber: number | null };
+type Message = { role: "user" | "assistant"; content: string; sources?: Source[] };
 
 const markdownComponents: Components = {
     p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -24,6 +25,10 @@ const STUDY_ACTIONS = [
     { label: "Summary", prompt: "Summarize my documents clearly, covering the key points." },
     { label: "Study notes", prompt: "Create concise, well-organized study notes from my documents, with headings and bullet points." },
 ];
+
+function sourceLabel(s: Source) {
+    return s.pageNumber ? `${s.documentName}, p.${s.pageNumber}` : s.documentName;
+}
 
 export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -90,9 +95,24 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
                             }`}
                     >
                         {m.role === "assistant" ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                {m.content}
-                            </ReactMarkdown>
+                            <>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                    {m.content}
+                                </ReactMarkdown>
+                                {m.sources && m.sources.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
+                                        <span className="text-xs font-medium text-slate-500">Sources:</span>
+                                        {m.sources.map((s, j) => (
+                                            <span
+                                                key={j}
+                                                className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600"
+                                            >
+                                                {sourceLabel(s)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             m.content
                         )}
