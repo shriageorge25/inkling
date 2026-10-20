@@ -2,11 +2,12 @@ import OpenAI from "openai";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
 import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
+import { retrieveChunks } from "../../../../lib/retrieval";
 
 export const runtime = "nodejs";
 
-const MAX_CONTEXT_CHARS = 60000;
 const MAX_HISTORY = 20;
+const TOP_K = 6;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -57,7 +58,6 @@ export async function POST(
 
         const workspace = await prisma.workspace.findFirst({
             where: { id, userId: user.id },
-            include: { documents: true },
         });
         if (!workspace) {
             return Response.json({ error: "Workspace not found" }, { status: 404 });
@@ -71,22 +71,36 @@ export async function POST(
         const usage = await consumeAiUsage(user.id, "chat");
         if (!usage.allowed) return limitReachedResponse();
 
-        let context = workspace.documents
-            .map((d) => `### ${d.name}\n${d.textChunks}`)
-            .join("\n\n");
-        if (context.length > MAX_CONTEXT_CHARS) {
-            context = context.slice(0, MAX_CONTEXT_CHARS);
-        }
-
-        const systemPrompt = context
-            ? `You are Inkling, a study assistant. Answer using the documents below. If the answer is not in the documents, say so clearly instead of guessing.\n\nDOCUMENTS:\n${context}`
-            : `You are Inkling, a study assistant. The user has not uploaded any documents yet, so tell them to upload a PDF if they want answers based on their material.`;
-
         const existing = await prisma.chat.findFirst({
             where: { workspaceId: id, userId: user.id },
         });
         const history = existing ? parseMessages(existing.messages) : [];
         const messages: ChatMessage[] = [...history, { role: "user", content: message }];
+
+        // Short follow-ups like "explain that more" have no searchable meaning on
+        // their own, so borrow the previous user question to give retrieval context.
+        const previousUser = [...history].reverse().find((m) => m.role === "user");
+        const searchQuery =
+            message.length < 40 && previousUser
+                ? `${previousUser.content}\n${message}`
+                : message;
+
+        const chunks = await retrieveChunks(id, user.id, searchQuery, TOP_K);
+        console.log(
+            "Retrieved:",
+            chunks.map((c) => `p.${c.pageNumber} (${Number(c.distance).toFixed(3)})`)
+        );
+
+        const context = chunks
+            .map(
+                (c, i) =>
+                    `[Source ${i + 1}: ${c.documentName}${c.pageNumber ? `, p.${c.pageNumber}` : ""}]\n${c.content}`
+            )
+            .join("\n\n");
+
+        const systemPrompt = context
+            ? `You are Inkling, a study assistant. Answer using only the excerpts below, which were retrieved from the user's documents. If the answer is not in the excerpts, say so clearly instead of guessing.\n\nEXCERPTS:\n${context}`
+            : `You are Inkling, a study assistant. The user has not uploaded any documents yet, so tell them to upload a PDF if they want answers based on their material.`;
 
         const completion = await openai.chat.completions.create({
             model: process.env.AI_MODEL ?? "gemini-2.5-flash-lite",

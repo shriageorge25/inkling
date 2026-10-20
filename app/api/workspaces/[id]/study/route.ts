@@ -2,11 +2,13 @@ import { z } from "zod";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
 import { openai, AI_MODEL } from "../../../../lib/ai";
-import { buildContext } from "../../../../lib/context";
+import { sampleChunks } from "../../../../lib/retrieval";
 import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const SAMPLE_SIZE = 12;
 
 const quizSchema = z.object({
     title: z.string().min(1),
@@ -103,19 +105,27 @@ export async function POST(
 
         const workspace = await prisma.workspace.findFirst({
             where: { id, userId: user.id },
-            include: { documents: true },
         });
         if (!workspace) {
             return Response.json({ error: "Workspace not found" }, { status: 404 });
         }
-        if (workspace.documents.length === 0) {
+
+        const chunks = await sampleChunks(id, user.id, SAMPLE_SIZE);
+        if (chunks.length === 0) {
             return Response.json({ error: "Upload a document first" }, { status: 400 });
         }
+        console.log(`Study: sampled ${chunks.length} chunks`);
 
         const usage = await consumeAiUsage(user.id, "study");
         if (!usage.allowed) return limitReachedResponse();
         const { schema, instruction } = TYPES[type];
-        const context = buildContext(workspace.documents);
+
+        const context = chunks
+            .map(
+                (c, i) =>
+                    `[Excerpt ${i + 1}: ${c.documentName}${c.pageNumber ? `, p.${c.pageNumber}` : ""}]\n${c.content}`
+            )
+            .join("\n\n");
 
         let parsed: unknown = null;
         for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
@@ -124,7 +134,7 @@ export async function POST(
                 messages: [
                     {
                         role: "system",
-                        content: `You are Inkling, a study assistant. Use only the documents below.\n\nDOCUMENTS:\n${context}`,
+                        content: `You are Inkling, a study assistant. Use only the excerpts below, which are sampled from across the user's documents.\n\nEXCERPTS:\n${context}`,
                     },
                     { role: "user", content: instruction },
                 ],

@@ -1,8 +1,10 @@
 import { extractText } from "unpdf";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/current-user";
+import { indexDocument, UserFacingError } from "../../../../lib/indexing";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -38,10 +40,11 @@ export async function POST(
         }
 
         const buffer = new Uint8Array(await file.arrayBuffer());
-        const { text } = await extractText(buffer, { mergePages: true });
-        const cleaned = text.trim();
+        const { text: pageTexts } = await extractText(buffer, { mergePages: false });
+        const pages = pageTexts.map((text, i) => ({ text, page: i + 1 }));
+        const fullText = pageTexts.join("\n\n").trim();
 
-        if (!cleaned) {
+        if (!fullText) {
             return Response.json(
                 { error: "No readable text found. Scanned PDFs aren't supported yet." },
                 { status: 422 }
@@ -49,8 +52,21 @@ export async function POST(
         }
 
         const document = await prisma.document.create({
-            data: { name: file.name, workspaceId: id, textChunks: cleaned },
+            data: { name: file.name, workspaceId: id, textChunks: fullText },
         });
+
+        try {
+            const count = await indexDocument(document.id, id, pages);
+            console.log(`Indexed ${count} chunks for "${document.name}"`);
+        } catch (err) {
+            console.error("Indexing failed:", err);
+            await prisma.document.delete({ where: { id: document.id } });
+            const message =
+                err instanceof UserFacingError
+                    ? err.message
+                    : "Could not process the document. Please try again.";
+            return Response.json({ error: message }, { status: 422 });
+        }
 
         return Response.json(
             { id: document.id, name: document.name },

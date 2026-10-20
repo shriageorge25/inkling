@@ -29,6 +29,7 @@ model Workspace {
   chats     Chat[]
   documents Document[]
   studyMaterials StudyMaterial[]
+  chunks DocumentChunk[]
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -38,6 +39,7 @@ model Document {
   workspaceId String
   textChunks  String
   createdAt   DateTime  @default(now())
+  chunks DocumentChunk[]
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
@@ -101,4 +103,19 @@ model UsageEvent {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model DocumentChunk {
+  id          String                 @id @default(cuid())
+  documentId  String
+  workspaceId String
+  chunkIndex  Int
+  content     String
+  pageNumber  Int?
+  embedding   Unsupported("vector(768)")
+  createdAt   DateTime               @default(now())
+  document    Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace   Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
