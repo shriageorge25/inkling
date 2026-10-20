@@ -5,6 +5,7 @@ import { consumeAiUsage, limitReachedResponse } from "../../../../lib/usage";
 import { retrieveChunks, type RetrievedChunk } from "../../../../lib/retrieval";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_HISTORY = 20;
 const TOP_K = 6;
@@ -149,38 +150,78 @@ ${context}`
             .slice(-MAX_HISTORY)
             .map(({ role, content }) => ({ role, content }));
 
-        const completion = await openai.chat.completions.create({
-            model: process.env.AI_MODEL ?? "gemini-2.5-flash-lite",
-            messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
+        const encoder = new TextEncoder();
+
+        const stream = new ReadableStream({
+            async start(controller) {
+                // If the browser has disconnected, enqueue throws; ignore that.
+                const emit = (event: object) => {
+                    try {
+                        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+                    } catch { }
+                };
+
+                try {
+                    const completion = await openai.chat.completions.create({
+                        model: process.env.AI_MODEL ?? "gemini-2.5-flash-lite",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            ...modelMessages,
+                        ],
+                        stream: true,
+                    });
+
+                    let rawReply = "";
+                    for await (const part of completion) {
+                        const delta = part.choices[0]?.delta?.content ?? "";
+                        if (!delta) continue;
+                        rawReply += delta;
+                        emit({ type: "delta", text: delta });
+                    }
+
+                    const { content: reply, sources } = extractCitations(rawReply, chunks);
+                    console.log("Cited:", sources);
+
+                    const updated: ChatMessage[] = [
+                        ...messages,
+                        sources.length > 0
+                            ? { role: "assistant", content: reply, sources }
+                            : { role: "assistant", content: reply },
+                    ];
+
+                    if (existing) {
+                        await prisma.chat.update({
+                            where: { id: existing.id },
+                            data: { messages: JSON.stringify(updated) },
+                        });
+                    } else {
+                        await prisma.chat.create({
+                            data: {
+                                userId: user.id,
+                                workspaceId: id,
+                                messages: JSON.stringify(updated),
+                            },
+                        });
+                    }
+
+                    emit({ type: "done", messages: updated });
+                } catch (error) {
+                    console.error(error);
+                    emit({ type: "error", error: "Failed to get a reply" });
+                } finally {
+                    try {
+                        controller.close();
+                    } catch { }
+                }
+            },
         });
 
-        const rawReply = completion.choices[0]?.message?.content ?? "";
-        const { content: reply, sources } = extractCitations(rawReply, chunks);
-        console.log("Cited:", sources);
-
-        const updated: ChatMessage[] = [
-            ...messages,
-            sources.length > 0
-                ? { role: "assistant", content: reply, sources }
-                : { role: "assistant", content: reply },
-        ];
-
-        if (existing) {
-            await prisma.chat.update({
-                where: { id: existing.id },
-                data: { messages: JSON.stringify(updated) },
-            });
-        } else {
-            await prisma.chat.create({
-                data: {
-                    userId: user.id,
-                    workspaceId: id,
-                    messages: JSON.stringify(updated),
-                },
-            });
-        }
-
-        return Response.json({ reply, messages: updated });
+        return new Response(stream, {
+            headers: {
+                "Content-Type": "application/x-ndjson; charset=utf-8",
+                "Cache-Control": "no-cache, no-transform",
+            },
+        });
     } catch (error) {
         console.error(error);
         return Response.json({ error: "Failed to get a reply" }, { status: 500 });

@@ -30,6 +30,15 @@ function sourceLabel(s: Source) {
     return s.pageNumber ? `${s.documentName}, p.${s.pageNumber}` : s.documentName;
 }
 
+// While text streams in, hide complete [Source N] markers and any
+// half-written marker at the end (like "[Sour"). The server sends the
+// final cleaned text when the stream finishes.
+function hideMarkers(raw: string) {
+    return raw
+        .replace(/\[[^\]]*Source[^\]]*\]/gi, "")
+        .replace(/\[[^\]]*$/, "");
+}
+
 export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
@@ -45,9 +54,9 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
             .catch(() => { });
     }, [workspaceId]);
 
-    // Scroll to the newest message
+    // Scroll to the newest message (instant while streaming, smooth otherwise)
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        bottomRef.current?.scrollIntoView({ behavior: loading ? "auto" : "smooth" });
     }, [messages, loading]);
 
     async function send(override?: string) {
@@ -55,7 +64,8 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
         if (!text || loading) return;
 
         const previous = messages;
-        setMessages([...previous, { role: "user", content: text }]);
+        const withUser: Message[] = [...previous, { role: "user", content: text }];
+        setMessages(withUser);
         setInput("");
         setLoading(true);
         setError("");
@@ -66,9 +76,50 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text }),
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Request failed");
-            setMessages(data.messages);
+
+            // Errors before streaming starts (401, 404, 429...) are plain JSON
+            if (!res.ok || !res.body) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Request failed");
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let raw = "";
+            let finished = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                // A network chunk can end mid-line, so keep the last piece
+                const lines = buffer.split("\n");
+                buffer = lines.pop() ?? "";
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    const event = JSON.parse(line);
+
+                    if (event.type === "delta") {
+                        raw += event.text;
+                        setMessages([
+                            ...withUser,
+                            { role: "assistant", content: hideMarkers(raw) },
+                        ]);
+                    } else if (event.type === "done") {
+                        setMessages(event.messages);
+                        finished = true;
+                    } else if (event.type === "error") {
+                        throw new Error(event.error || "Something went wrong");
+                    }
+                }
+            }
+
+            if (!finished) {
+                throw new Error("The response was cut off. Please try again.");
+            }
         } catch (err) {
             setMessages(previous);
             setInput(text);
@@ -78,6 +129,10 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
         }
     }
 
+    const last = messages[messages.length - 1];
+    const waitingForFirstWord =
+        loading && (!last || last.role === "user" || last.content === "");
+
     return (
         <div className="mt-3 flex h-[28rem] flex-col">
             <div className="flex-1 space-y-3 overflow-y-auto pr-1">
@@ -86,39 +141,43 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
                         Ask a question about your documents to get started.
                     </p>
                 )}
-                {messages.map((m, i) => (
-                    <div
-                        key={i}
-                        className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${m.role === "user"
-                            ? "ml-auto whitespace-pre-wrap bg-slate-900 text-white"
-                            : "bg-slate-100 text-slate-900"
-                            }`}
-                    >
-                        {m.role === "assistant" ? (
-                            <>
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                                    {m.content}
-                                </ReactMarkdown>
-                                {m.sources && m.sources.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
-                                        <span className="text-xs font-medium text-slate-500">Sources:</span>
-                                        {m.sources.map((s, j) => (
-                                            <span
-                                                key={j}
-                                                className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600"
-                                            >
-                                                {sourceLabel(s)}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            m.content
-                        )}
-                    </div>
-                ))}
-                {loading && <p className="text-sm text-slate-500">Thinking...</p>}
+                {messages.map((m, i) => {
+                    // Skip an assistant bubble that has no text yet
+                    if (m.role === "assistant" && !m.content) return null;
+                    return (
+                        <div
+                            key={i}
+                            className={`max-w-[85%] rounded-lg px-4 py-2 text-sm ${m.role === "user"
+                                ? "ml-auto whitespace-pre-wrap bg-slate-900 text-white"
+                                : "bg-slate-100 text-slate-900"
+                                }`}
+                        >
+                            {m.role === "assistant" ? (
+                                <>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                        {m.content}
+                                    </ReactMarkdown>
+                                    {m.sources && m.sources.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
+                                            <span className="text-xs font-medium text-slate-500">Sources:</span>
+                                            {m.sources.map((s, j) => (
+                                                <span
+                                                    key={j}
+                                                    className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600"
+                                                >
+                                                    {sourceLabel(s)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                m.content
+                            )}
+                        </div>
+                    );
+                })}
+                {waitingForFirstWord && <p className="text-sm text-slate-500">Thinking...</p>}
                 <div ref={bottomRef} />
             </div>
 
