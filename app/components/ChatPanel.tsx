@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 type Source = { documentName: string; pageNumber: number | null };
 type Message = { role: "user" | "assistant"; content: string; sources?: Source[] };
@@ -154,7 +157,11 @@ export default function ChatPanel({ workspaceId }: { workspaceId: string }) {
                         >
                             {m.role === "assistant" ? (
                                 <>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                        rehypePlugins={[rehypeKatex]}
+                                        components={markdownComponents}
+                                    >
                                         {m.content}
                                     </ReactMarkdown>
                                     {m.sources && m.sources.length > 0 && (
