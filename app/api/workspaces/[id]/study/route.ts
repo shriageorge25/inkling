@@ -114,7 +114,7 @@ export async function POST(
         if (chunks.length === 0) {
             return Response.json({ error: "Upload a document first" }, { status: 400 });
         }
-        console.log(`Study: sampled ${chunks.length} chunks`);
+
 
         const usage = await consumeAiUsage(user.id, "study");
         if (!usage.allowed) return limitReachedResponse();

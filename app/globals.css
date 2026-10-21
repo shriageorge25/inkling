@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Design tokens. Each --color-* becomes utilities: bg-canvas, text-fg, border-line, etc. */
+@theme {
+  --color-canvas: #0c0f17;
+  --color-surface: #121722;
+  --color-raised: #181e2c;
+  --color-line: #232b3d;
+  --color-fg: #e2e6ee;
+  --color-fg-muted: #8b94a7;
+  --color-accent: #1e3a8a;
+  --color-accent-hover: #264aa8;
+  --color-accent-ink: #8fa8ff;
+
+  --radius-card: 0.75rem;
 }
 
+/* Fonts come from next/font in layout.tsx, so these must reference its variables. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-script: var(--font-imperial-script), cursive;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Dark is the only theme for now: tells the browser to draw scrollbars and form controls dark. */
+:root {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* Visible keyboard focus everywhere, in the lighter blue so it's actually seen. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+
+/* Wide display equations scroll sideways instead of overflowing the card. */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Flashcard flip: a 3D rotation, or a simple fade for reduced motion. */
+.flip-scene {
+  perspective: 1000px;
+}
+
+.flip-card {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 250ms ease;
+}
+
+.flip-card[data-flipped="true"] {
+  transform: rotateY(180deg);
+}
+
+.flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .flip-card,
+  .flip-card[data-flipped="true"] {
+    transform: none;
+    transition: none;
+  }
+
+  .flip-face {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    transition: opacity 150ms ease;
+  }
+
+  .flip-back {
+    transform: none;
+    opacity: 0;
+  }
+
+  .flip-card[data-flipped="true"] .flip-back {
+    opacity: 1;
+  }
+
+  .flip-card[data-flipped="true"] .flip-front {
+    opacity: 0;
+  }
+}
+
+/* Respect the OS "reduce motion" setting for the status pulses too. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
 }

@@ -123,10 +123,6 @@ export async function POST(
                 : message;
 
         const chunks = await retrieveChunks(id, user.id, searchQuery, TOP_K);
-        console.log(
-            "Retrieved:",
-            chunks.map((c) => `p.${c.pageNumber} (${Number(c.distance).toFixed(3)})`)
-        );
 
         const context = chunks
             .map(
@@ -181,7 +177,6 @@ ${context}`
                     }
 
                     const { content: reply, sources } = extractCitations(rawReply, chunks);
-                    console.log("Cited:", sources);
 
                     const updated: ChatMessage[] = [
                         ...messages,

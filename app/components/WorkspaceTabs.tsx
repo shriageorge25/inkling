@@ -8,23 +8,35 @@ export default function WorkspaceTabs({ workspaceId }: { workspaceId: string }) 
     const [tab, setTab] = useState<"chat" | "study">("chat");
 
     const tabClass = (active: boolean) =>
-        `rounded-lg px-4 py-2 text-sm font-medium ${active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+        `-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors duration-150 ${active
+            ? "border-accent-ink text-fg"
+            : "border-transparent text-fg-muted hover:text-fg"
         }`;
 
     return (
         <div>
-            <div className="flex gap-2">
-                <button onClick={() => setTab("chat")} className={tabClass(tab === "chat")}>
+            <div role="tablist" className="flex gap-1 border-b border-line">
+                <button
+                    role="tab"
+                    aria-selected={tab === "chat"}
+                    onClick={() => setTab("chat")}
+                    className={tabClass(tab === "chat")}
+                >
                     Chat
                 </button>
-                <button onClick={() => setTab("study")} className={tabClass(tab === "study")}>
+                <button
+                    role="tab"
+                    aria-selected={tab === "study"}
+                    onClick={() => setTab("study")}
+                    className={tabClass(tab === "study")}
+                >
                     Study
                 </button>
             </div>
-            <div className={tab === "chat" ? "" : "hidden"}>
+            <div role="tabpanel" className={tab === "chat" ? "pt-4" : "hidden"}>
                 <ChatPanel workspaceId={workspaceId} />
             </div>
-            <div className={tab === "study" ? "" : "hidden"}>
+            <div role="tabpanel" className={tab === "study" ? "pt-4" : "hidden"}>
                 <StudyPanel workspaceId={workspaceId} />
             </div>
         </div>

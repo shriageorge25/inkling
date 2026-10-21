@@ -38,9 +38,9 @@ export default function CreateWorkspace() {
         return (
             <button
                 onClick={() => setOpen(true)}
-                className="rounded-lg bg-slate-900 px-5 py-3 font-medium text-white hover:bg-slate-700"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover"
             >
-                + Create Workspace
+                + New workspace
             </button>
         );
     }
@@ -54,14 +54,14 @@ export default function CreateWorkspace() {
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                     placeholder="Workspace name"
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900"
+                    className="w-full rounded-md border border-line bg-raised px-3 py-2 text-base text-fg placeholder:text-fg-muted sm:w-64 sm:text-sm"
                 />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+                {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
             </div>
             <button
                 onClick={handleCreate}
                 disabled={loading}
-                className="rounded-lg bg-slate-900 px-5 py-3 font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent-hover disabled:opacity-50"
             >
                 {loading ? "Creating..." : "Create"}
             </button>
@@ -70,7 +70,7 @@ export default function CreateWorkspace() {
                     setOpen(false);
                     setError("");
                 }}
-                className="rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-200"
+                className="rounded-md px-3 py-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-raised hover:text-fg"
             >
                 Cancel
             </button>

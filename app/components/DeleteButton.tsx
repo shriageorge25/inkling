@@ -36,7 +36,7 @@ export default function DeleteButton({
         <button
             onClick={handleDelete}
             disabled={busy}
-            className="text-xs text-red-600 hover:underline disabled:opacity-50"
+            className="rounded px-2 py-1.5 text-xs text-fg-muted transition-colors duration-150 hover:text-red-400 disabled:opacity-50"
         >
             {busy ? "Deleting..." : label}
         </button>

@@ -13,32 +13,46 @@ export default function FlashcardsView({ deck }: { deck: FlashcardsContent }) {
         setFlipped(false);
     }
 
+    const face =
+        "flip-face flex items-center justify-center rounded-card border border-line p-6 text-center text-lg leading-snug";
+
     return (
         <div>
-            <button
-                onClick={() => setFlipped(!flipped)}
-                className="flex h-48 w-full items-center justify-center rounded-xl border border-slate-300 bg-white p-6 text-center text-lg text-slate-900 hover:bg-slate-50"
-            >
-                {flipped ? card.back : card.front}
-            </button>
-            <p className="mt-2 text-center text-xs text-slate-500">
-                {flipped ? "Answer" : "Question"} · click the card to flip
+            <div className="flip-scene">
+                <button
+                    onClick={() => setFlipped(!flipped)}
+                    aria-label={flipped ? "Showing answer. Click to show question." : "Showing question. Click to show answer."}
+                    className="flip-card block h-52 w-full"
+                    data-flipped={flipped}
+                >
+                    <span aria-hidden={flipped} className={`${face} flip-front bg-surface`}>
+                        {card.front}
+                    </span>
+                    <span aria-hidden={!flipped} className={`${face} flip-back bg-raised`}>
+                        {card.back}
+                    </span>
+                </button>
+            </div>
+
+            <p className="mt-3 text-center font-mono text-xs text-fg-muted">
+                {flipped ? "ANSWER" : "QUESTION"} · click the card to flip
             </p>
+
             <div className="mt-4 flex items-center justify-between">
                 <button
                     onClick={() => go(index - 1)}
                     disabled={index === 0}
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                    className="rounded-md border border-line bg-raised px-4 py-2 text-sm text-fg transition-colors duration-150 hover:border-fg-muted disabled:opacity-40"
                 >
                     Previous
                 </button>
-                <span className="text-sm text-slate-600">
-                    Card {index + 1} of {deck.cards.length}
+                <span className="font-mono text-sm text-fg-muted">
+                    {index + 1} / {deck.cards.length}
                 </span>
                 <button
                     onClick={() => go(index + 1)}
                     disabled={index === deck.cards.length - 1}
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                    className="rounded-md border border-line bg-raised px-4 py-2 text-sm text-fg transition-colors duration-150 hover:border-fg-muted disabled:opacity-40"
                 >
                     Next
                 </button>

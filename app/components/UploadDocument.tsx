@@ -41,10 +41,25 @@ export default function UploadDocument({ workspaceId }: { workspaceId: string })
                 accept="application/pdf"
                 onChange={handleChange}
                 disabled={uploading}
-                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:font-medium file:text-white hover:file:bg-slate-700"
+                className="block w-full text-xs text-fg-muted file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-white file:transition-colors file:duration-150 hover:file:bg-accent-hover disabled:opacity-50 disabled:file:cursor-not-allowed"
             />
-            {uploading && <p className="mt-2 text-sm text-slate-500">Uploading and reading PDF...</p>}
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+            {uploading && (
+                <p
+                    role="status"
+                    className="mt-3 flex items-center gap-2 text-sm text-fg-muted"
+                >
+                    <span
+                        aria-hidden
+                        className="h-2 w-2 animate-pulse rounded-full bg-accent-ink"
+                    />
+                    Uploading and indexing... this can take a few seconds.
+                </p>
+            )}
+            {error && (
+                <p role="alert" className="mt-3 text-sm text-red-400">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
